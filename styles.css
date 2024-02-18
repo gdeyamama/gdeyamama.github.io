@@ -1,0 +1,112 @@
+:root {
+	--header-height: 48px;
+	--footer-height: 48px;
+	--color-primary: indigo;
+}
+body {
+	background: #f8f8f8;
+	font-family: monospace;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: center;
+	width: 100vw;
+	height: 100vh;
+}
+
+
+main {
+	flex-grow: 1;
+}
+
+#map {
+	height: 100%;
+}
+
+footer {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	z-index: 100400;
+	padding: 8px 16px;
+	background: rgba(255, 255, 255, 0.5);
+}
+
+footer label {
+
+}
+
+.routepoint-div-icon, .routelog-div-icon {
+	display: block;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	position: absolute;
+}
+
+.routepoint-div-icon:after {
+	content: '';
+	display: block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	position: absolute;
+	transform: translate(-50%, -50%);
+	background: red;
+}
+
+.routepoint-div-icon div:before {
+	content: attr(data-name);
+	text-shadow: 1px 1px 1px #fff;
+	position: absolute;
+	transform: translateY(-50%);
+	left: 100%;
+	white-space: nowrap;
+	background: rgba(255,255,255,0.3);
+	border-radius: 2px;
+	padding: 0 2px;
+	font-size: 0.7rem;
+}
+
+.routelog-div-icon:after {
+	content: '';
+	display: block;
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	position: absolute;
+	transform: translate(-50%, -50%);
+	background: rgba(0,0,0,0.5);
+}
+
+.routelog-div-icon div:before {
+	content: attr(data-name);
+	color: grey;
+	text-shadow: 1px 1px 1px #fff;
+	position: absolute;
+	transform: translateY(-50%);
+	left: 100%;
+	white-space: nowrap;
+	padding: 0 2px;
+	font-size: 0.7rem;
+	background: rgba(243, 203, 0, 0.58);
+}
+
+#fab {
+	width: 48px;
+	height: 48px;
+	border-radius: 48px;
+	line-height: 48px;
+	text-align: center;
+	margin: 8px;
+	box-shadow: 8px 8px 16px rgba(0,0,0,0.3);
+	border: none;
+	background: var(--color-primary);
+	color: #fff;
+	z-index: 100500;
+	position: absolute;
+	right: 16px;
+	bottom: 16px;
+}
