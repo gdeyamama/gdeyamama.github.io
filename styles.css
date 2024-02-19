@@ -2,10 +2,22 @@
 	--header-height: 48px;
 	--footer-height: 48px;
 	--color-primary: indigo;
+  --text: #000;
+  --bg: #fff;
 }
+
+/* @media (prefers-color-scheme: dark) {
+  :root {
+    --text: #fff;
+    --bg: #000;
+  }
+} */
+
 body {
-	background: #f8f8f8;
-	font-family: monospace;
+  font-family: "Source Sans Pro", sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+
 	margin: 0;
 	padding: 0;
 	display: flex;
@@ -25,17 +37,13 @@ main {
 	height: 100%;
 }
 
-footer {
-	position: absolute;
-	bottom: 0;
-	left: 0;
-	z-index: 100400;
-	padding: 8px 16px;
-	background: rgba(255, 255, 255, 0.5);
-}
-
-footer label {
-
+.header {
+  padding: 4px 10px;
+  background-color: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .routepoint-div-icon, .routelog-div-icon, .iamhere-div-icon {
@@ -116,7 +124,7 @@ footer label {
 	z-index: 100500;
 	position: absolute;
 	right: 16px;
-	bottom: 16px;
+	bottom: 132px;
 }
 
 #fab.loading:before {
@@ -179,11 +187,12 @@ fieldset {
   border-width: 1px;
   border-style: solid;
   border-radius: 6px;
-  padding: 3px
+  padding: 3px;
+  font-family: monospace;
 }
 
 fieldset legend {
-  font-size: 0.8em;;
+  font-size: 0.8em;
 }
 
 fieldset > div {
@@ -212,3 +221,35 @@ fieldset div[data-title]::before {
   position: absolute;
 }
 
+#svg {
+
+}
+
+footer {
+  overflow-x: auto;
+  height: 130px;
+  padding-top: 8px;
+}
+
+footer label {
+
+}
+
+line {
+  stroke-dasharray: 5,5;
+  stroke: #adadad
+}
+
+.pointLine {
+  stroke: blueviolet
+}
+
+.myLine {stroke: red; }
+
+#toplineText { position: sticky; }
+#midlineText { position: sticky; }
+#bottomlineText { position: sticky; }
+
+header {
+  min-height: 96px;
+}

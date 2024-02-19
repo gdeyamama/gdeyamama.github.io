@@ -123,6 +123,12 @@ const init = () => {
 			computeFromCurrentPosition()
 		}
 
+    btn.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      computeFromCurrentPosition(prompt('Комментарий к отметке', ''))
+    }
+
 		const polyline = L.polyline(track.map(([a, b]) => ([a,b])), {color: 'grey', weight: 6, opacity: 0.5})
 		polyline.addTo(map)
 		map.fitBounds(polyline.getBounds());
@@ -178,12 +184,12 @@ const init = () => {
 		lo.forEach((log) => {
 			const icon = L.divIcon({
 				className: 'routelog-div-icon',
-				html: "<div data-name='" + new Date(log.date).toLocaleTimeString().substr(0,5) + (log.dateEnd ? `-${new Date(log.dateEnd).toLocaleTimeString().substr(0,5)}` : '') + "' class='" + (log.dateEnd ? 'routelog-div-icon-pause': '') + "'></div>",
+				html: "<div data-name='" + new Date(log.date).toLocaleTimeString().substr(0,5) + (log.dateEnd ? `-${new Date(log.dateEnd).toLocaleTimeString().substr(0,5)}` : '') + (log.comment ? '*' : '') +"' class='" + (log.dateEnd ? 'routelog-div-icon-pause': '') + "'></div>",
 				iconSize: [4, 4],
 				iconAnchor: [2, 2]
 			})
 			const marker = L.marker(log.coords, { icon });
-			const popup = L.popup().setContent([log.date, log.dateEnd].join(' <br> '));
+			const popup = L.popup().setContent([log.date, log.dateEnd, log.comment].join(' <br> '));
 
 			marker.bindPopup(popup).openPopup();
 			marker.addTo(logMarkersGroup);
@@ -226,7 +232,7 @@ const init = () => {
     return sum / parts.length
   }
 
-  function handleCurrentPosition(coords, date = new Date()) {
+  function handleCurrentPosition(coords, date = new Date(), comment) {
     let [nearPoint, nearDist, nearInd] = [
       track[0], getDistance(coords, track[0]), 0
     ];
@@ -248,6 +254,9 @@ const init = () => {
         // Тремся на той же точке
         if (lasLog.trackIndex === nearInd || (now - new Date(lasLog.date) <= (stackBySeconds * 1000) || getDistance(lasLog.coords, nearPoint) <= stackByMeters)) {
           lasLog.dateEnd = now.toISOString();
+          if (comment) {
+            lasLog.comment = lasLog.comment ? [lasLog.comment,comment].join('\n') : comment;
+          }
           localStorage.setItem(logsDataLSKey, JSON.stringify(logs));
           drawLogs(logs)
         } else {
@@ -263,7 +272,7 @@ const init = () => {
 
           console.log({ lastSpeedKmH, avgSpeedKmH })
 
-          logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, speed: speedKmH });
+          logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, speed: speedKmH, comment });
 
           localStorage.setItem(logsDataLSKey, JSON.stringify(logs));
 
@@ -271,7 +280,7 @@ const init = () => {
         }
 
       } else {
-        logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, speed: 0 });
+        logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, speed: 0, comment });
         localStorage.setItem(logsDataLSKey, JSON.stringify(logs));
         drawLogs(logs)
       }
@@ -367,6 +376,10 @@ avgSpeedKmH ?  crEl('div', {d:{ label: 'км/ч', title: 'средняя' }}, av
 stat.appendChild(speedGroup)
   
 
+    headerElement.appendChild(crEl('div', {c:'header'}, 
+      crEl('span', meta.name),
+     // crEl('button', {}, '⇪ ' + logs.length)
+    ));
     headerElement.appendChild(stat);
     
     polylinePassed = L.polyline(passedTrackPart, {color: 'green', opacity: 1})
@@ -377,9 +390,137 @@ stat.appendChild(speedGroup)
     polylinePassed.addTo(map)
     polylineFutured.addTo(map)
         polylineNextPoint.addTo(map)
+
+        return [nearPoint, nearDist, nearInd];
   }
 
-	function computeFromCurrentPosition() {
+  const drawChart = (currentPotitionIndex) => {
+    const svg = document.getElementById('svg');
+    const plln = document.getElementById('plln');
+    const alts = track.map((d) => d[2]);
+    const min = Math.min(...alts);
+    const max = Math.max(...alts);
+    const diff = Math.ceil(max) - Math.floor(min);
+
+    const topOffset = 20;
+    const leftOffset = 40;
+    const bottomOffset = 15;
+
+    svg.setAttribute('viewBox', `0 0 ${alts.length + leftOffset} ${diff + topOffset + bottomOffset}`);
+
+    let lastKm = 0;
+    let kmSum = 0;
+
+    plln.setAttribute('points', alts.map((a, i) => {
+
+        if (i > 0) {
+            kmSum += getDistance(track[i-1], track[i]);
+            console.info(kmSum);
+            if (kmSum/1000 > lastKm + 1) {
+                lastKm++;
+
+                console.log(lastKm, kmSum);
+                const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
+                text.setAttribute('x',  i + leftOffset);
+                text.setAttribute('style', 'text-anchor: middle;');
+                text.setAttribute('y', diff + topOffset + bottomOffset);
+                text.textContent = lastKm;
+
+                svg.appendChild(text);
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg",'line')
+                //<line x1="0" y1="0" x2="100" y2="20"  id="bottomline" />
+                line.setAttribute('x1', i + leftOffset);
+                line.setAttribute('y1', topOffset-3);
+                line.setAttribute('x2', i+ leftOffset);
+                line.setAttribute('y2', diff + topOffset );
+               
+
+                svg.appendChild(line);
+            }
+        }
+
+
+        return ([i + leftOffset, Math.round(max - a) + topOffset, ].join(','))
+    }).join(' '))
+
+    const topline = document.getElementById('topline');
+    const midline = document.getElementById('midline');
+    const bottomline = document.getElementById('bottomline');
+
+    topline.setAttribute('x1', leftOffset)
+    midline.setAttribute('x1', leftOffset)
+    bottomline.setAttribute('x1', leftOffset)
+    topline.setAttribute('x2', alts.length+leftOffset)
+    midline.setAttribute('x2', alts.length+leftOffset)
+    bottomline.setAttribute('x2', alts.length+leftOffset)
+
+
+    topline.setAttribute('y1', topOffset);
+    topline.setAttribute('y2', topOffset);
+
+    
+    midline.setAttribute('y1', Math.round(diff / 2) + topOffset);
+    midline.setAttribute('y2', Math.round(diff / 2) + topOffset);
+
+    
+    bottomline.setAttribute('y1', Math.floor(diff-1)+topOffset);
+    bottomline.setAttribute('y2', Math.floor(diff-1)+topOffset);
+
+    const toplineText = document.getElementById('toplineText');
+    const midlineText = document.getElementById('midlineText');
+    const bottomlineText = document.getElementById('bottomlineText');
+    toplineText.setAttribute('y', topOffset+7);
+    midlineText.setAttribute('y', Math.round(diff / 2)+topOffset);
+    bottomlineText.setAttribute('y', Math.floor(diff-1)+topOffset);
+    toplineText.textContent = Math.ceil(max) + ' м';
+    midlineText.textContent = Math.ceil(max - (diff / 2));
+    bottomlineText.textContent = Math.ceil(min);
+
+    points.forEach((p, i, all) => {
+        const line = document.createElementNS("http://www.w3.org/2000/svg",'line')
+        //<line x1="0" y1="0" x2="100" y2="20"  id="bottomline" />
+        line.setAttribute('x1', p.trackIndex + leftOffset);
+        line.setAttribute('y1', topOffset-3);
+        line.setAttribute('x2', p.trackIndex+ leftOffset);
+        line.setAttribute('y2', diff + topOffset );
+        line.setAttribute('class', 'pointLine' );
+
+        svg.appendChild(line);
+        
+        const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
+        text.setAttribute('x',  p.trackIndex+ leftOffset);
+        text.setAttribute('style', i === all.length - 1 ? 'text-anchor: end;' : i === 0 ? '': 'text-anchor: middle;');
+        text.setAttribute('y', 12);
+        text.textContent = p.name
+
+        svg.appendChild(text);
+
+    })
+
+    if (currentPotitionIndex) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg",'line')
+      //<line x1="0" y1="0" x2="100" y2="20"  id="bottomline" />
+      line.setAttribute('x1', currentPotitionIndex + leftOffset);
+      line.setAttribute('y1', topOffset-3);
+      line.setAttribute('x2', currentPotitionIndex + leftOffset);
+      line.setAttribute('y2', diff + topOffset );
+      line.setAttribute('style', 'stroke: red');
+
+      svg.appendChild(line);
+      
+      const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
+      text.setAttribute('x',  currentPotitionIndex + leftOffset);
+      text.setAttribute('style', 'text-anchor: middle; fill: red');
+      text.setAttribute('y', diff + topOffset +12);
+      text.textContent = 'Я'
+
+      svg.appendChild(text);
+      text.scrollIntoView()
+    }
+  }
+
+	function computeFromCurrentPosition(comment) {
     document.getElementById('fab').classList.add('loading');
 
 		navigator.geolocation.getCurrentPosition(function (position) {
@@ -388,8 +529,9 @@ stat.appendChild(speedGroup)
       const coords = [position.coords.latitude, position.coords.longitude];
 
       drawCurrentPosition(coords);
-			handleCurrentPosition(coords);
+			const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date(), comment);
       drawLogs(logs);
+      drawChart(nearInd)
 			
 			//map.fitBounds(polylineForNearest.getBounds());
 		});
@@ -414,6 +556,8 @@ stat.appendChild(speedGroup)
       drawLogs(logs);
     }
   })
+
+  computeFromCurrentPosition()
 
 }
 
