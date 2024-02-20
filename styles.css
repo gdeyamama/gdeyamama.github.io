@@ -181,6 +181,7 @@ main {
 .statContainer {
   display: flex;
   padding: 8px;
+  overflow-x: auto;
 }
 
 fieldset {
@@ -193,6 +194,9 @@ fieldset {
 
 fieldset legend {
   font-size: 0.8em;
+  white-space: nowrap;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
 }
 
 fieldset > div {

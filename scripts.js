@@ -270,13 +270,12 @@ const init = () => {
 
           avgSpeedKmH = computeAvgSpeed(logs, date)
 
-          console.log({ lastSpeedKmH, avgSpeedKmH })
+      
 
           logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, speed: speedKmH, comment });
 
           localStorage.setItem(logsDataLSKey, JSON.stringify(logs));
 
-          console.log({diffMs, diffMeters, lastSpeedKmH});
         }
 
       } else {
@@ -358,8 +357,11 @@ const init = () => {
   const nearestGroup = crEl('fieldset', {},
   crEl('legend', nearestPoint.name),
   crEl('div', 
+  distanceForNear < 50 ? 'Вы тут' : [
     crEl('div', {d:{ label: 'м' }}, Math.round(distanceForNear).toString()),
-    lastSpeedKmH ? crEl('div', {d:{ label: 'минут' }}, (((distanceForNear/1000) / lastSpeedKmH) * 60).toFixed(1)) : '—'
+  avgSpeedKmH ? crEl('div', {d:{ label: 'минут' }}, Math.ceil(((distanceForNear/1000) / avgSpeedKmH) * 60).toString()) : '—'
+  ]
+  
   )
 );
 
@@ -375,10 +377,35 @@ avgSpeedKmH ?  crEl('div', {d:{ label: 'км/ч', title: 'средняя' }}, av
 
 stat.appendChild(speedGroup)
   
-
+console.log(window.auth)
     headerElement.appendChild(crEl('div', {c:'header'}, 
       crEl('span', meta.name),
-     // crEl('button', {}, '⇪ ' + logs.length)
+      crEl('button', {
+        e: {click: () => {
+          console.log(logs);
+
+          const normalizeLogs = (log) => {
+            if (!log.comment) log.comment = '';
+            if (!log.dateEnd) log.dateEnd = null;
+            if (!log.speed) log.speed = 0;
+            return log;
+          }
+
+          window.db.set(`logs/${window.auth.user.uid}/${new Date().toISOString().substring(0, 10)}`, logs.map(normalizeLogs));
+        }},
+      }, '⇪ ' + logs.length),
+      crEl('span', {}, 
+      window.auth?.user
+      ? crEl('img', {
+        src: window.auth.user.photoURL,
+        height: 24,
+        alt: '👱‍♂️',
+        e: {
+          contextmenu: () => confirm('Выйти из аккаунта?') && window.auth.logout(),
+        },
+        title: [window.auth.user.displayName, window.auth.user.email].join('\n'),
+      })
+      : crEl('button', {e:{click: () => window.auth.login()}}, 'Войти'))
     ));
     headerElement.appendChild(stat);
     
@@ -415,11 +442,11 @@ stat.appendChild(speedGroup)
 
         if (i > 0) {
             kmSum += getDistance(track[i-1], track[i]);
-            console.info(kmSum);
+          
             if (kmSum/1000 > lastKm + 1) {
                 lastKm++;
 
-                console.log(lastKm, kmSum);
+        
                 const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
                 text.setAttribute('x',  i + leftOffset);
                 text.setAttribute('style', 'text-anchor: middle;');
@@ -541,7 +568,7 @@ stat.appendChild(speedGroup)
 
   map.on('contextmenu', e => {
     L.DomEvent.stopPropagation(e);
-    console.log(e);
+  
     document.getElementById('demoDialog').showModal()
     document.getElementById('demodate').showPicker();
 
