@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Просмотр трека</title>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+	
+</head>
+<body>
+	<h2>Список треков</h2>
+	<div id="res">Загрузка...</div>
+	<div id="map" style="height:400px"></div>
+	<div id="editForm"></div>
+	<script src="utils.js"></script>
+	<script async type="module" src="firebase.js"></script>
+    <script>
+
+		const position = [53, 45]
+		const map = L.map('map').setView(position, 15)
+		L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+	
+		let markersGroup;
+		let polylinesGroup;
+		
+		const data = []; // [lat, lon, alt*]
+		let points = []; // [lat, lon, alt*]
+	
+		const drawPoints = (_, cur) => {
+			markersGroup && map.removeLayer(markersGroup)
+			markersGroup = L.featureGroup();
+			markersGroup.addTo(map);
+			console.log('Draw Points', points)
+			points.forEach((point) => {
+				const marker = L.marker([point.lat, point.lon]);
+				marker.bindPopup(point.name);
+				
+
+				
+				marker.bindTooltip(point.name);
+				marker.addTo(markersGroup);
+				
+				if (cur && cur.src === point.src) {
+					marker.openPopup()
+				}
+			})
+		};
+	
+	const getTrack = async (hash) => {
+		const url = await window.cloudStorage.getFileUrl(`tracks/${hash}.gpx`);
+		const r = await fetch(url);
+		const fileContent = await r.text();
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(fileContent, "text/xml");
+		const trkpts = Array.from(doc.getElementsByTagName('trkpt'));
+		const rtepts = Array.from(doc.getElementsByTagName('rtept'));
+		const wpts = Array.from(doc.getElementsByTagName('wpt'));
+	
+
+	
+	const meta = {
+		name: doc.querySelector('metadata>name')?.textContent
+				|| doc.querySelector('rte>name')?.textContent
+				|| doc.querySelector('trk>name')?.textContent
+				|| '',
+		desc: doc.querySelector('metadata>desc')?.textContent
+				|| doc.querySelector('rte>desc')?.textContent
+				|| doc.querySelector('trk>desc')?.textContent
+				|| '',
+		author: {
+			name: doc.querySelector('metadata>author>name'),
+			email:  doc.querySelector('metadata>author>email')
+		},
+		time: doc.querySelector('metadata>time')?.textContent,
+		keywords: doc.querySelector('metadata>keywords')?.textContent
+	};
+
+	[...trkpts, ...rtepts].forEach((p) => {
+		const d = [
+			parseFloat(p.getAttribute('lat')),
+			parseFloat(p.getAttribute('lon'))
+		];
+	
+		const eleEl = p.querySelector('ele');
+		if (eleEl) {
+			d.push(parseFloat(eleEl.textContent))
+		}
+
+		data.push(d);
+	});
+
+	wpts.forEach((p, i) => {
+	
+		const lat = parseFloat(p.getAttribute('lat'));
+		const lon = parseFloat(p.getAttribute('lon'));
+		const trackIndex = data.findIndex(([la, lo]) => la == lat && lo == lon);
+		
+		const point = {
+			lat,
+			lon,
+			ele: parseFloat(p.querySelector('ele')?.textContent || data[trackIndex]?.[2] || 0),
+			name: p.querySelector('name')?.textContent ?? `Point #${i}`,
+			cmt: p.querySelector('cmt')?.textContent ?? '',
+			desc: p.querySelector('desc')?.textContent ?? '',
+			src: trackIndex
+		}
+
+		if (trackIndex < 0) {
+			const [nearPoint, nearDist, nearInd] = getNearestPointInfo([lat, lon], data);
+			point.src = nearInd;
+			point.lat = nearPoint[0];
+			point.lon = nearPoint[1];
+			point.ele = nearPoint[2];
+		}
+
+		points.push(point);
+		
+		
+	});
+	drawPoints(points)
+	
+	const pl = new L.Polyline(data, {color: 'red'}).addTo(map);
+	
+			
+	const bounds = L.latLngBounds(data);
+	map.fitBounds(bounds)
+
+	
+	const drawMeta = () => {
+		const editForm = document.getElementById('editForm');
+		editForm.innerHTML = '';
+		editForm.appendChild(crEl('form', { c:'point-form', e: { submit: async (e) => {
+			e.preventDefault();
+			const formData = new FormData(e.target);
+			meta.name = formData.get('name'),
+			meta.desc = formData.get('desc');
+			meta.keywords = formData.get('keywords');
+			
+			const xml = crEl('gpx', {
+				xmlns: 'http://www.topografix.com/GPX/1/1',
+				version: '1.1',
+				creator: 'gdeyamama.github.io',
+				['xmlns:xsi']: 'http://www.w3.org/2001/XMLSchema-instance',
+				['xsi:schemaLocation']: 'http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd',
+			},
+				crEl('metadata',
+					crEl('name', meta.name),
+					crEl('desc', meta.desc),
+					crEl('keywords', meta.keywords),
+					crEl('time', new Date().toISOString()),
+					crEl('author',
+						crEl('name', meta.author.name),
+						crEl('email', meta.author.email),
+					),
+				),
+				/*
+			lat,
+			lon,
+			ele: parseFloat(data[trackIndex]?.[2] || 0),
+			name: '',
+			cmt: '',
+			desc: '',
+			src: trackIndex
+				*/
+				points.map((point) => {
+					return crEl('wpt', { lat: point.lat, lon: point.lon },
+						point.ele && crEl('ele',point.ele.toString()),
+						point.name && crEl('name',point.name),
+						point.cmt && crEl('cmt',point.cmt),
+						point.desc && crEl('desc',point.desc),
+						point.src && crEl('src',point.src.toString()),
+					)
+				}),
+				crEl('rte', 
+					data.map(([lat, lon, ele]) => {
+						return crEl('rtept', {lat, lon}, ele && crEl('ele',ele.toString()))
+					})
+				)
+			)
+			
+			const str = `<?xml version="1.0" encoding="UTF-8" standalone="no" ?>${xml.outerHTML}`
+			
+			const link = document.createElement("a");
+
+
+			const file = new Blob([str], { type: 'application/gpx+xml' });
+
+			
+			if (confirm('Скачать файл?')) {
+				link.href = URL.createObjectURL(file);
+				link.download = meta.name + ".gpx";
+				link.click();
+				URL.revokeObjectURL(link.href)
+			}
+			
+			if (window.auth.user) {
+				const trackUid = await window.db.getUniqueKey('tracks');
+				await window.cloudStorage.addFile(`tracks/${trackUid}.gpx`, file);
+				await window.db.set(
+					`tracks/${trackUid}`,
+					{
+						...meta,
+						authorId: window.auth.user.uid
+					}
+				);
+				alert(`Загружен на север #${trackUid}`);
+				
+			} else {
+				alert('Пользователь не авторизован. На сервер не выгружено');
+			}
+			
+			
+			drawMeta()
+		} } },
+			crEl('label',
+				'Название трека',
+				crEl('input', { required: true, name: 'name', value: meta.name })
+			),
+			crEl('label',
+				'Описание трека',
+				crEl('textarea', { name: 'desc' }, meta.desc)
+			),
+			crEl('label',
+				'Ключевые слова (,)',
+				crEl('textarea', { name: 'keywords' }, meta.keywords)
+			),
+			crEl('div', {s:'text-align:right'}, crEl('input', {type:'submit', value: 'Сохранить трек'}))
+		))
+	}
+	
+	drawMeta();
+	}
+	
+		setTimeout(() => {
+
+			window.auth.loginListeners.push(() => {
+				getTrack(window.location.hash.substr(1));
+			})
+			!window.auth.user && window.auth.login();
+
+			if (window.auth.user) getTrack(window.location.hash.substr(1));
+		}, 1000)
+	
+	</script>
+       
+</body>
+</html>

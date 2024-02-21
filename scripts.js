@@ -11,24 +11,27 @@ document.getElementsByClassName( 'leaflet-control-attribution' )[0].style.displa
 const footerElement = document.getElementById('footer');
 const headerElement = document.getElementById('header');
 
+const trackHashLSKey = 'track-hash';
+const trackMetaLSKey = 'track-meta';
+const trackDataLSKey = 'track-data';
+const pointsDataLSKey = 'points-data';
+const logsDataLSKey = 'logs-data';
+const logsLastUploadLSKey = 'logs-data-upload-date';
 
 
-
-
-const init = () => {
-  const trackMetaLSKey = 'track-meta';
-	const trackDataLSKey = 'track-data';
-	const pointsDataLSKey = 'points-data';
-	const logsDataLSKey = 'logs-data';
-
+const init = async (hashStr) => {
+  const trackHash = localStorage.getItem(trackHashLSKey);
 	const trackDataStr = localStorage.getItem(trackDataLSKey);
 	const pointsDataStr = localStorage.getItem(pointsDataLSKey);
 	const logsDataStr = localStorage.getItem(logsDataLSKey);
 	const trackMetaStr = localStorage.getItem(trackMetaLSKey);
+	const lastUploadDate = localStorage.getItem(logsLastUploadLSKey);
+
+  const [hash, hashUser] = hashStr.split('/');
 	
 	const points = JSON.parse(pointsDataStr || '[]');
-	const track = JSON.parse(trackDataStr || '[]');
-	const logs = JSON.parse(logsDataStr || '[]');
+	let track = JSON.parse(trackDataStr || '[]');
+	let logs = JSON.parse(logsDataStr || '[]');
 	const meta = JSON.parse(trackMetaStr || '{}');
 
 	let currentPositionMarker;
@@ -41,28 +44,60 @@ const init = () => {
 	let lastSpeedKmH;
 	let avgSpeedKmH;
 
+  if (hash && trackHash && trackHash != hash && !confirm('Сохраненный на вашем устройстве трек отличается от того, что вы пытаетесь открыть? Обновить?')) {
+    window.location.hash = '#';
+    localStorage.removeItem(trackHashLSKey)
+    localStorage.removeItem(pointsDataLSKey);
+    localStorage.removeItem(trackDataLSKey);
+    localStorage.removeItem(trackMetaLSKey);
+    localStorage.removeItem(logsLastUploadLSKey);
+    track = [];
+    init();
+    return;
+  } else {
+
+    //location.reload()
+  } 
+
 	if (!track.length) {
-		headerElement.innerHTML = '';
-		const inp = document.createElement('input');
-		inp.setAttribute('type', 'file');
-		inp.setAttribute('accept', '.gpx');
-		inp.onchange = async (e) => {
-			const file = e.target.files[0];
-			const fileContent = await file.text();
+		const url = await window.cloudStorage.getFileUrl(`tracks/${hash}.gpx`);
+		const r = await fetch(url);
+		const fileContent = await r.text();
+
 			const parser = new DOMParser();
 			const doc = parser.parseFromString(fileContent, "text/xml");
-			const points = Array.from(doc.getElementsByTagName('trkpt'));
+
+			const trkpts = Array.from(doc.getElementsByTagName('trkpt'));
+			const rtepts = Array.from(doc.getElementsByTagName('rtept'));
 			const wpts = Array.from(doc.getElementsByTagName('wpt'));
-			const data = []; // [lat, lon, alt*]
-			const pointsData = []; // [lat, lon, alt*]
-			const meta = {};
-      
-      meta.name = doc.querySelector('trk>name')?.textContent ?? doc.querySelector('metadata>name')?.textContent;
-      meta.description = doc.querySelector('metadata>desc')?.textContent;
-      meta.uploadAt = new Date();
+			
+			const trackData = []; // [lat, lon, alt*]
+			const pointsData = [];
+			const metaData = {};
+		
+	
+			const parsedmeta = {
+				name: doc.querySelector('metadata>name')?.textContent
+						|| doc.querySelector('rte>name')?.textContent
+						|| doc.querySelector('trk>name')?.textContent
+						|| e.target.files[0].name,
+				desc: doc.querySelector('metadata>desc')?.textContent
+						|| doc.querySelector('rte>desc')?.textContent
+						|| doc.querySelector('trk>desc')?.textContent
+						|| '',
+				author: {
+					name: doc.querySelector('metadata>author>name')?.textContent,
+					email: doc.querySelector('metadata>author>email')?.textContent
+				},
+				time: doc.querySelector('metadata>time')?.textContent,
+				keywords: doc.querySelector('metadata>keywords')?.textContent
+			};
+			
+			Object.assign(metaData, parsedmeta);
 
-
-			points.forEach((p) => {
+			const allTracksPoints = [...trkpts, ...rtepts];
+			
+			allTracksPoints.forEach((p) => {
 				const d = [
 					parseFloat(p.getAttribute('lat')),
 					parseFloat(p.getAttribute('lon'))
@@ -73,7 +108,7 @@ const init = () => {
 					d.push(parseFloat(eleEl.textContent))
 				}
 
-				data.push(d);
+				trackData.push(d);
 			});
 
 			wpts.forEach((p, i) => {
@@ -86,35 +121,41 @@ const init = () => {
 				if (eleEl) {
 					d.push(parseFloat(eleEl.textContent))
 				}
-
-
-
-				const name = p.querySelector('name')?.textContent ?? `Point #${i}`;
-
-				let trackIndex = data.findIndex(([lat, lon]) => d[0] == lat && d[1] == lon);
-
-				if (trackIndex < 0) {
-					const [nearPoint, nearDist, nearInd] = getNearestPointInfo(d, data);
-					trackIndex = nearInd;
-					d = nearPoint;
+				
+				const lat = parseFloat(p.getAttribute('lat'));
+				const lon = parseFloat(p.getAttribute('lon'));
+				const trackIndex = trackData.findIndex(([la, lo]) => la == lat && lo == lon);
+				
+				const point = {
+					lat,
+					lon,
+					ele: parseFloat(p.querySelector('ele')?.textContent || trackData[trackIndex]?.[2] || 0),
+					name: p.querySelector('name')?.textContent ?? `Point #${i}`,
+					cmt: p.querySelector('cmt')?.textContent ?? '',
+					desc: p.querySelector('desc')?.textContent ?? '',
+					src: trackIndex
 				}
 
-				pointsData.push({ name, coords: d, trackIndex });
+				if (trackIndex < 0) {
+					const [nearPoint, nearDist, nearInd] = getNearestPointInfo([lat, lon], trackData);
+					point.src = nearInd;
+					point.lat = nearPoint[0];
+					point.lon = nearPoint[1];
+					point.ele = nearPoint[2];
+				}
+				
+				point.coords = [point.lat, point.lon, point.ele];
+				point.trackIndex = point.src
+
+				pointsData.push(point)
 			});
 
+      localStorage.setItem(trackHashLSKey, hash.split('/')[0])
 			localStorage.setItem(pointsDataLSKey, JSON.stringify(pointsData));
-			localStorage.setItem(trackDataLSKey, JSON.stringify(data));
-			localStorage.setItem(trackMetaLSKey, JSON.stringify(meta));
-			init();
-      window.location.reload()
-		}
-	
-		const lbl = document.createElement('label');
-    lbl.classList.add('needFile')
-		lbl.textContent = 'Загрузите GPX трек';
-		lbl.appendChild(document.createElement('br'))
-		lbl.appendChild(inp)
-		headerElement.appendChild(lbl)
+			localStorage.setItem(trackDataLSKey, JSON.stringify(trackData));
+			localStorage.setItem(trackMetaLSKey, JSON.stringify(metaData));
+      localStorage.removeItem(logsLastUploadLSKey);
+			init(hash);
 	} else {
 
 
@@ -143,7 +184,11 @@ const init = () => {
 			})
 					
 			const marker = L.marker(point.coords, { icon });
-			const popup = L.popup().setContent(point.name);
+			const popup = L.popup().setContent(crEl(
+				crEl('div', crEl('b', point.name)),
+				crEl('p', point.desc),
+				crEl('p', crEl('small', {s: {opacity:0.5}}, point.cmt))
+			));
 			marker.on('contextmenu',(e) => {
 				L.DomEvent.stopPropagation(e);
 				if (confirm('Удалить ' + point.name + '?')) {
@@ -198,6 +243,7 @@ const init = () => {
 	}
 
   function drawCurrentPosition(coords) {
+	  if (!track) {return}
     currentPositionMarker && map.removeLayer(currentPositionMarker)
     
 
@@ -233,6 +279,8 @@ const init = () => {
   }
 
   function handleCurrentPosition(coords, date = new Date(), comment) {
+	  if (!track) return;
+	  
     let [nearPoint, nearDist, nearInd] = [
       track[0], getDistance(coords, track[0]), 0
     ];
@@ -358,7 +406,7 @@ const init = () => {
   crEl('legend', nearestPoint.name),
   crEl('div', 
   distanceForNear < 50 ? 'Вы тут' : [
-    crEl('div', {d:{ label: 'м' }}, Math.round(distanceForNear).toString()),
+    crEl('div', {d:{ label: 'м' }}, (distanceForNear / 1000).toFixed(1)),
   avgSpeedKmH ? crEl('div', {d:{ label: 'минут' }}, Math.ceil(((distanceForNear/1000) / avgSpeedKmH) * 60).toString()) : '—'
   ]
   
@@ -377,10 +425,24 @@ avgSpeedKmH ?  crEl('div', {d:{ label: 'км/ч', title: 'средняя' }}, av
 
 stat.appendChild(speedGroup)
   
-console.log(window.auth)
+console.log(window.auth);
+
+    const lastUploadDateStr = localStorage.getItem(logsLastUploadLSKey);
+
+    const unuploadedLogs = logs.filter((l) => new Date(l.dateEnd || l.date) >= new Date(lastUploadDateStr))
+
     headerElement.appendChild(crEl('div', {c:'header'}, 
-      crEl('span', meta.name),
-      crEl('button', {
+      crEl('span', {title: meta.desc, e: { click: () => {
+		  const d = crEl('dialog',
+			crEl('h4', 
+			crEl('button', {s: {float: 'right'}, e: {click: () => { d.close(); document.body.removeChild(d) }}}, '×'),
+			meta.name),
+			crEl('p', {s: {width: '80vw',whiteSpace: 'pre-line' }}, meta.desc)
+		  );
+		  document.body.appendChild(d)
+		  d.showModal()
+	  } }}, meta.name),
+      hashUser ? crEl('strong', 'Наблюдатель') : crEl('button', {
         e: {click: () => {
           console.log(logs);
 
@@ -391,9 +453,11 @@ console.log(window.auth)
             return log;
           }
 
+          localStorage.setItem(logsLastUploadLSKey, new Date().toISOString())
+
           window.db.set(`logs/${window.auth.user.uid}/${new Date().toISOString().substring(0, 10)}`, logs.map(normalizeLogs));
         }},
-      }, '⇪ ' + logs.length),
+      }, '⇪ ' + unuploadedLogs.length),
       crEl('span', {}, 
       window.auth?.user
       ? crEl('img', {
@@ -401,6 +465,7 @@ console.log(window.auth)
         height: 24,
         alt: '👱‍♂️',
         e: {
+          click: () => prompt('Скопируйте ссылку', location.origin + window.location.hash.split('/') + '/' + window.auth.user.uid),
           contextmenu: () => confirm('Выйти из аккаунта?') && window.auth.logout(),
         },
         title: [window.auth.user.displayName, window.auth.user.email].join('\n'),
@@ -428,12 +493,17 @@ console.log(window.auth)
     const min = Math.min(...alts);
     const max = Math.max(...alts);
     const diff = Math.ceil(max) - Math.floor(min);
+	
+	const dw = document.body.clientWidth;
+	const hCoeff = alts.length < dw ? Math.ceil(dw / alts.length)+1 : 1
+	
+	console.log({ hCoeff })
 
     const topOffset = 20;
     const leftOffset = 40;
     const bottomOffset = 15;
 
-    svg.setAttribute('viewBox', `0 0 ${alts.length + leftOffset} ${diff + topOffset + bottomOffset}`);
+    svg.setAttribute('viewBox', `0 0 ${(alts.length * hCoeff) + leftOffset} ${diff + topOffset + bottomOffset}`);
 
     let lastKm = 0;
     let kmSum = 0;
@@ -448,7 +518,7 @@ console.log(window.auth)
 
         
                 const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
-                text.setAttribute('x',  i + leftOffset);
+                text.setAttribute('x',  (i * hCoeff) + leftOffset);
                 text.setAttribute('style', 'text-anchor: middle;');
                 text.setAttribute('y', diff + topOffset + bottomOffset);
                 text.textContent = lastKm;
@@ -457,9 +527,9 @@ console.log(window.auth)
 
                 const line = document.createElementNS("http://www.w3.org/2000/svg",'line')
                 //<line x1="0" y1="0" x2="100" y2="20"  id="bottomline" />
-                line.setAttribute('x1', i + leftOffset);
+                line.setAttribute('x1', (i * hCoeff) + leftOffset);
                 line.setAttribute('y1', topOffset-3);
-                line.setAttribute('x2', i+ leftOffset);
+                line.setAttribute('x2', (i * hCoeff) + leftOffset);
                 line.setAttribute('y2', diff + topOffset );
                
 
@@ -468,7 +538,7 @@ console.log(window.auth)
         }
 
 
-        return ([i + leftOffset, Math.round(max - a) + topOffset, ].join(','))
+        return ([(i * hCoeff) + leftOffset, Math.round(max - a) + topOffset, ].join(','))
     }).join(' '))
 
     const topline = document.getElementById('topline');
@@ -478,9 +548,9 @@ console.log(window.auth)
     topline.setAttribute('x1', leftOffset)
     midline.setAttribute('x1', leftOffset)
     bottomline.setAttribute('x1', leftOffset)
-    topline.setAttribute('x2', alts.length+leftOffset)
-    midline.setAttribute('x2', alts.length+leftOffset)
-    bottomline.setAttribute('x2', alts.length+leftOffset)
+    topline.setAttribute('x2', (alts.length * hCoeff)+leftOffset)
+    midline.setAttribute('x2', (alts.length * hCoeff)+leftOffset)
+    bottomline.setAttribute('x2', (alts.length * hCoeff)+leftOffset)
 
 
     topline.setAttribute('y1', topOffset);
@@ -507,16 +577,16 @@ console.log(window.auth)
     points.forEach((p, i, all) => {
         const line = document.createElementNS("http://www.w3.org/2000/svg",'line')
         //<line x1="0" y1="0" x2="100" y2="20"  id="bottomline" />
-        line.setAttribute('x1', p.trackIndex + leftOffset);
+        line.setAttribute('x1', (p.trackIndex * hCoeff) + leftOffset);
         line.setAttribute('y1', topOffset-3);
-        line.setAttribute('x2', p.trackIndex+ leftOffset);
+        line.setAttribute('x2', (p.trackIndex * hCoeff)+ leftOffset);
         line.setAttribute('y2', diff + topOffset );
         line.setAttribute('class', 'pointLine' );
 
         svg.appendChild(line);
         
         const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
-        text.setAttribute('x',  p.trackIndex+ leftOffset);
+        text.setAttribute('x',  (p.trackIndex * hCoeff)+ leftOffset);
         text.setAttribute('style', i === all.length - 1 ? 'text-anchor: end;' : i === 0 ? '': 'text-anchor: middle;');
         text.setAttribute('y', 12);
         text.textContent = p.name
@@ -526,42 +596,74 @@ console.log(window.auth)
     })
 
     if (currentPotitionIndex) {
+      const el = svg.getElementById('myLineText')
+      if (el) {svg.removeChild(el)}
+
+      const el1 = svg.getElementById('myLine')
+      if (el1) {svg.removeChild(el1)}
+
       const line = document.createElementNS("http://www.w3.org/2000/svg",'line')
       //<line x1="0" y1="0" x2="100" y2="20"  id="bottomline" />
-      line.setAttribute('x1', currentPotitionIndex + leftOffset);
+      line.setAttribute('x1', (currentPotitionIndex * hCoeff) + leftOffset);
       line.setAttribute('y1', topOffset-3);
-      line.setAttribute('x2', currentPotitionIndex + leftOffset);
+      line.setAttribute('x2', (currentPotitionIndex * hCoeff) + leftOffset);
       line.setAttribute('y2', diff + topOffset );
       line.setAttribute('style', 'stroke: red');
+      line.setAttribute('id', 'myLine');
 
       svg.appendChild(line);
       
       const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
-      text.setAttribute('x',  currentPotitionIndex + leftOffset);
+      text.setAttribute('x',  (currentPotitionIndex * hCoeff) + leftOffset);
       text.setAttribute('style', 'text-anchor: middle; fill: red');
       text.setAttribute('y', diff + topOffset +12);
       text.textContent = 'Я'
+      text.setAttribute('id', 'myLineText');
 
       svg.appendChild(text);
-      text.scrollIntoView()
+      text.scrollIntoView({  block: "center", inline: "center" })
     }
   }
 
-	function computeFromCurrentPosition(comment) {
+	async function computeFromCurrentPosition(comment) {
     document.getElementById('fab').classList.add('loading');
 
-		navigator.geolocation.getCurrentPosition(function (position) {
-      document.getElementById('fab').classList.remove('loading');
-      
-      const coords = [position.coords.latitude, position.coords.longitude];
+    if (hashUser) {
+      const user = await window.db.get(`users/${hashUser}`);
+      document.getElementById('fab').innerHTML = `<svg class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall  css-f5io2" focusable="false" aria-hidden="true" viewBox="0 0 24 24" width="24" data-testid="SyncIcon" aria-label="fontSize small"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8m0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4z" fill="white"></path></svg>`;
+      document.getElementById('fab').style.background = `url('${user.photo}')`;
+      document.getElementById('fab').style.backgroundSize = 'cover'
+      document.getElementById('fab').title = user.name
+      console.log(user);
 
+
+      const userLogs = await window.db.get(`logs/${hashUser}/${new Date().toISOString().substring(0, 10)}`);
+      console.log({userLogs})
+      logs = userLogs;
+      drawLogs(userLogs);
+      
+      const {coords} = userLogs[userLogs.length-1]
       drawCurrentPosition(coords);
-			const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date(), comment);
-      drawLogs(logs);
+      const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
       drawChart(nearInd)
-			
-			//map.fitBounds(polylineForNearest.getBounds());
-		});
+
+      document.getElementById('fab').classList.remove('loading');
+    } else {
+      navigator.geolocation.getCurrentPosition(function (position) {
+        document.getElementById('fab').classList.remove('loading');
+        
+        const coords = [position.coords.latitude, position.coords.longitude];
+  
+        drawCurrentPosition(coords);
+        const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date(), comment);
+        drawLogs(logs);
+        drawChart(nearInd)
+        
+        //map.fitBounds(polylineForNearest.getBounds());
+      });
+    }
+
+
 	}
 
 	drawLogs(logs);
@@ -580,14 +682,25 @@ console.log(window.auth)
       
       drawCurrentPosition(coords);
 			handleCurrentPosition(coords, new Date(new Date().setHours(...e.target.value.split(':'))));
+			const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
       drawLogs(logs);
+      drawChart(nearInd)
     }
   })
 
-  computeFromCurrentPosition()
+  //computeFromCurrentPosition()
 
 }
 
-init();
+
+setTimeout(() => {
+
+  window.auth.loginListeners.push(() => {
+    getTrack(window.location.hash.substr(1));
+  })
+  !window.auth.user && window.auth.login();
+
+  if (window.auth.user) init(window.location.hash?.substr(1));
+}, 1000)
 
 

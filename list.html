@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список треков</title>
+</head>
+<body>
+	<h2>Список треков</h2>
+	<div id="res">Загрузка...</div>
+	<script src="utils.js"></script>
+	<script async type="module" src="firebase.js"></script>
+    <script>
+		
+
+const getTracks = async () => {
+	const tracksData = await window.db.get(`tracks`);
+	const el = document.getElementById('res');
+	el.innerHTML = '';
+	el.appendChild(crEl('ul', Object.entries(tracksData).map(([k,v]) => {
+		return crEl('li',
+			crEl('b', {title: [v.name, v.time, v.author.name, v.keywords, v.desc].join('\n')}, v.name),
+			' \u00a0 ',
+			crEl('a', {href:`/#${k}`}, 'Смотреть')
+		)
+	})))
+}
+
+
+
+		setTimeout(() => {
+
+			window.auth.loginListeners.push(() => {
+				getTracks();
+			})
+			!window.auth.user && window.auth.login();
+
+			if (window.auth.user) getTracks()
+		}, 1000)
+	
+	</script>
+       
+</body>
+</html>
