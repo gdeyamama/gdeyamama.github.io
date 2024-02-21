@@ -495,7 +495,9 @@ console.log(window.auth);
     const diff = Math.ceil(max) - Math.floor(min);
 	
 	const dw = document.body.clientWidth;
-	const hCoeff = alts.length < dw ? Math.ceil(dw / alts.length)+1 : 1
+	const hCoeff = alts.length < dw ? Math.ceil(dw / alts.length)+1 : 1;
+
+  const vCoeff = diff < 100 ? Math.ceil(100 / diff)+1 : 1
 	
 	console.log({ hCoeff })
 
@@ -503,7 +505,7 @@ console.log(window.auth);
     const leftOffset = 40;
     const bottomOffset = 15;
 
-    svg.setAttribute('viewBox', `0 0 ${(alts.length * hCoeff) + leftOffset} ${diff + topOffset + bottomOffset}`);
+    svg.setAttribute('viewBox', `0 0 ${(alts.length * hCoeff) + leftOffset} ${(diff * vCoeff) + topOffset + bottomOffset}`);
 
     let lastKm = 0;
     let kmSum = 0;
@@ -520,7 +522,7 @@ console.log(window.auth);
                 const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
                 text.setAttribute('x',  (i * hCoeff) + leftOffset);
                 text.setAttribute('style', 'text-anchor: middle;');
-                text.setAttribute('y', diff + topOffset + bottomOffset);
+                text.setAttribute('y', (diff * vCoeff) + topOffset + bottomOffset);
                 text.textContent = lastKm;
 
                 svg.appendChild(text);
@@ -530,7 +532,7 @@ console.log(window.auth);
                 line.setAttribute('x1', (i * hCoeff) + leftOffset);
                 line.setAttribute('y1', topOffset-3);
                 line.setAttribute('x2', (i * hCoeff) + leftOffset);
-                line.setAttribute('y2', diff + topOffset );
+                line.setAttribute('y2', (diff * vCoeff) + topOffset );
                
 
                 svg.appendChild(line);
@@ -538,7 +540,7 @@ console.log(window.auth);
         }
 
 
-        return ([(i * hCoeff) + leftOffset, Math.round(max - a) + topOffset, ].join(','))
+        return ([(i * hCoeff) + leftOffset, (Math.round(max - a) * vCoeff) + topOffset, ].join(','))
     }).join(' '))
 
     const topline = document.getElementById('topline');
@@ -557,19 +559,19 @@ console.log(window.auth);
     topline.setAttribute('y2', topOffset);
 
     
-    midline.setAttribute('y1', Math.round(diff / 2) + topOffset);
-    midline.setAttribute('y2', Math.round(diff / 2) + topOffset);
+    midline.setAttribute('y1', Math.round((diff * vCoeff) / 2) + topOffset);
+    midline.setAttribute('y2', Math.round((diff * vCoeff) / 2) + topOffset);
 
     
-    bottomline.setAttribute('y1', Math.floor(diff-1)+topOffset);
-    bottomline.setAttribute('y2', Math.floor(diff-1)+topOffset);
+    bottomline.setAttribute('y1', Math.floor((diff * vCoeff)-1)+topOffset);
+    bottomline.setAttribute('y2', Math.floor((diff * vCoeff)-1)+topOffset);
 
     const toplineText = document.getElementById('toplineText');
     const midlineText = document.getElementById('midlineText');
     const bottomlineText = document.getElementById('bottomlineText');
     toplineText.setAttribute('y', topOffset+7);
-    midlineText.setAttribute('y', Math.round(diff / 2)+topOffset);
-    bottomlineText.setAttribute('y', Math.floor(diff-1)+topOffset);
+    midlineText.setAttribute('y', Math.round((diff * vCoeff) / 2)+topOffset);
+    bottomlineText.setAttribute('y', Math.floor((diff * vCoeff)-1)+topOffset);
     toplineText.textContent = Math.ceil(max) + ' м';
     midlineText.textContent = Math.ceil(max - (diff / 2));
     bottomlineText.textContent = Math.ceil(min);
@@ -580,7 +582,7 @@ console.log(window.auth);
         line.setAttribute('x1', (p.trackIndex * hCoeff) + leftOffset);
         line.setAttribute('y1', topOffset-3);
         line.setAttribute('x2', (p.trackIndex * hCoeff)+ leftOffset);
-        line.setAttribute('y2', diff + topOffset );
+        line.setAttribute('y2', (diff * vCoeff) + topOffset );
         line.setAttribute('class', 'pointLine' );
 
         svg.appendChild(line);
@@ -607,7 +609,7 @@ console.log(window.auth);
       line.setAttribute('x1', (currentPotitionIndex * hCoeff) + leftOffset);
       line.setAttribute('y1', topOffset-3);
       line.setAttribute('x2', (currentPotitionIndex * hCoeff) + leftOffset);
-      line.setAttribute('y2', diff + topOffset );
+      line.setAttribute('y2', (diff * vCoeff) + topOffset );
       line.setAttribute('style', 'stroke: red');
       line.setAttribute('id', 'myLine');
 
@@ -616,7 +618,7 @@ console.log(window.auth);
       const text = document.createElementNS("http://www.w3.org/2000/svg",'text')
       text.setAttribute('x',  (currentPotitionIndex * hCoeff) + leftOffset);
       text.setAttribute('style', 'text-anchor: middle; fill: red');
-      text.setAttribute('y', diff + topOffset +12);
+      text.setAttribute('y', (diff * vCoeff) + topOffset +12);
       text.textContent = 'Я'
       text.setAttribute('id', 'myLineText');
 
