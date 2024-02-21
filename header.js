@@ -22,7 +22,7 @@ const drawHeader = (meta) => {
         height: 24,
         alt: '👱‍♂️',
         e: {
-          click: () => prompt('Скопируйте ссылку', location.origin + window.location.hash.split('/') + '/' + window.auth.user.uid),
+          click: () => navigator.clipboard.writeText(prompt('Скопируйте ссылку', location.origin + window.location.hash.split('/') + '/' + window.auth.user.uid)),
           contextmenu: () => confirm('Выйти из аккаунта?') && window.auth.logout(),
         },
         title: [window.auth.user.displayName, window.auth.user.email].join('\n'),
