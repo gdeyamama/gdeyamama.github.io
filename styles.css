@@ -97,16 +97,21 @@ main {
 }
 
 .routelog-div-icon div:before {
-	content: attr(data-name);
-	color: grey;
-	text-shadow: 1px 1px 1px #fff;
-	position: absolute;
-	transform: translateY(-50%);
-	left: 100%;
-	white-space: nowrap;
-	padding: 0 2px;
-	font-size: 0.7rem;
-	background: rgba(243, 203, 0, 0.58);
+  content: attr(data-name);
+  color: indigo;
+  position: absolute;
+  transform: translateY(-50%);
+  left: 100%;
+  white-space: nowrap;
+  padding: 2px;
+  line-height: 0.6rem;
+  font-size: 0.6rem;
+  background: orange;
+  font-family: monospace;
+}
+
+.routelog-div-icon:hover div:before {
+  opacity: 0.6;
 }
 
 #fab {
@@ -255,5 +260,5 @@ line {
 #bottomlineText { position: sticky; }
 
 header {
-  min-height: 96px;
+  min-height: 36px;
 }
