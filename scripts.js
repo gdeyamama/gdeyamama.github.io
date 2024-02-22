@@ -19,10 +19,10 @@ const saveControl = L.control.savetiles(baseLayer, {
   alwaysDownload: false,
   confirm(layer, successCallback) {
     // eslint-disable-next-line no-alert
-    //if (window.confirm(`Save ${layer._tilesforSave.length}`)) {
+    if (window.confirm(`Сохранить карту OSM области маршрута для доступа без интернета (${layer._tilesforSave.length} кусков)`)) {
       console.log(`Save offline tiles ${layer._tilesforSave.length}`)
       successCallback();
-    //}
+    }
   },
   confirmRemoval(layer, successCallback) {
     // eslint-disable-next-line no-alert
