@@ -5,12 +5,38 @@ map.on('click', e => {
   console.log(e.latlng)
 })
 
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const urlTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+const baseLayer = L.tileLayer.offline(urlTemplate, {
 	maxZoom: 19,
 	attributionControl: false
 }).addTo(map);
 
+const saveControl = L.control.savetiles(baseLayer, {
+  zoomlevels: [12, 19], // optional zoomlevels to save, default current zoomlevel
+  alwaysDownload: false,
+  confirm(layer, successCallback) {
+    // eslint-disable-next-line no-alert
+    //if (window.confirm(`Save ${layer._tilesforSave.length}`)) {
+      console.log(`Save offline tiles ${layer._tilesforSave.length}`)
+      successCallback();
+    //}
+  },
+  confirmRemoval(layer, successCallback) {
+    // eslint-disable-next-line no-alert
+    //if (window.confirm('Remove all the tiles?')) {
+      console.log(`remove offline tiles ${layer._tilesforSave.length}`)
+      successCallback();
+    //}
+  },
+  saveText: 'ST',
+  rmText: 'RT',
+});
+saveControl.addTo(map);
+
 document.getElementsByClassName( 'leaflet-control-attribution' )[0].style.display = 'none';
+
+document.querySelector(`.savetiles.leaflet-bar`).style.display = 'none';
 
 const footerElement = document.getElementById('footer');
 const headerElement = document.getElementById('header');
@@ -21,6 +47,27 @@ const trackDataLSKey = 'track-data';
 const pointsDataLSKey = 'points-data';
 const logsDataLSKey = 'logs-data';
 const logsLastUploadLSKey = 'logs-data-upload-date';
+
+
+const hideInstallLSKey = 'logs-data-upload-date';
+
+function hideInstall() {
+  localStorage.setItem(hideInstallLSKey,'1');
+  document.getElementById('installInstructions').style.display = 'none'
+};
+
+document.getElementById('installInstructions').style.display = localStorage.getItem(hideInstallLSKey) ? 'none' : ''
+
+
+const clear = () => {
+  document.querySelector('a.rmtiles').click();
+  localStorage.removeItem(trackHashLSKey);
+  localStorage.removeItem(trackMetaLSKey);
+  localStorage.removeItem(trackDataLSKey);
+  localStorage.removeItem(pointsDataLSKey);
+  localStorage.removeItem(logsDataLSKey);
+  localStorage.removeItem(logsLastUploadLSKey);
+}
 
 
 const init = async (hashStr) => {
@@ -37,6 +84,7 @@ const init = async (hashStr) => {
   const isAnotherTrack = hashTrack && trackHashStr && trackHashStr !== hashTrack;
 
   if (isAnotherTrack && confirm('Сохраненный на вашем устройстве трек отличается от того, что вы пытаетесь открыть? Обновить?')) {
+    clear();
     localStorage.removeItem(trackHashLSKey)
     localStorage.removeItem(pointsDataLSKey);
     localStorage.removeItem(trackDataLSKey);
@@ -69,6 +117,23 @@ const init = async (hashStr) => {
     localStorage.setItem(trackDataLSKey, JSON.stringify(trackData));
     localStorage.setItem(trackMetaLSKey, JSON.stringify(metaData));
     localStorage.removeItem(logsLastUploadLSKey);
+
+
+    const polyline = L.polyline(
+      trackData.map(([a, b]) => ([a,b])),
+      {
+        color: 'grey',
+        weight: 6,
+        opacity: 0.5
+      }
+    );
+    polyline.addTo(map);
+    
+    map.fitBounds(polyline.getBounds());
+
+    document.querySelector('a.savetiles').click()
+
+
     return init(hashStr);
 	} 
   

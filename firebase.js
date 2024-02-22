@@ -23,6 +23,7 @@
       const auth = getAuth(app);
 
       const storage = getStorage(app);
+      const messaging = getMessaging(app);
 
       //console.log('auth.currentUser', auth.currentUser)
 
