@@ -81,7 +81,32 @@ const init = async (hashStr) => {
 	const trackMetaStr = localStorage.getItem(trackMetaLSKey);
 
 
-  const [hashTrack, hashUser] = hashStr.split('/');
+  let [hashTrack, hashUser] = hashStr.split('/');
+
+  if (!hashTrack || !hashTrack.length) {
+    const user = await checkUserOrAuth('Для получения списка маршрутов');
+    const dbTracks = await window.db.get(`tracks`);
+    hashTrack = await awaitModal((handleClose) => crEl(
+
+      crEl('strong', 'Выберите маршрут:'),
+      crEl('div', {s:{ overflowY:'auto', margin: '16px -16px' }}, 
+        Object.entries(dbTracks).map(([k, v]) => crEl('div', {
+          role:'button',
+          c:'list-item',
+          onclick: () => handleClose(true, k)
+        },
+          crEl(
+            crEl('span', { title: [v.name, v.time, v.author.name, v.keywords, v.desc].join('\n')}, v.name),
+          crEl('small', v.keywords)
+          )
+        ))
+      ),
+      
+
+    ));
+
+    window.location.hash = '#'+hashTrack
+  }
 
   const isAnotherTrack = hashTrack && trackHashStr && trackHashStr !== hashTrack;
 
@@ -160,12 +185,6 @@ const init = async (hashStr) => {
 
   drawHeader(meta);
 
-  window.addEventListener("authStateChange", (e) => {
-    //{ detail: { user } }
-    window.auth.user = e.detail.user
-    drawHeader(meta);
-  })
-
 
 
   const btn = document.getElementById('fab');
@@ -196,7 +215,6 @@ const init = async (hashStr) => {
 
         localStorage.setItem(logsLastUploadLSKey, new Date().toISOString())
         await checkUserOrAuth('Для отправки данных');
-        drawHeader(meta);
         await window.db.set(`logs/${window.auth.user.uid}/${trackHashStr}/${new Date().toISOString().substring(0, 10)}`, logs.map(normalizeLogs));
         this.innerText = '✅';
 
