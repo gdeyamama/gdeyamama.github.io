@@ -1,3 +1,5 @@
+console.info('WANT TO onAuthStateChanged')
+
 const mapElement = document.getElementById('map');
 const map = L.map(mapElement).setView([53.18, 45], 13);
 
@@ -107,6 +109,9 @@ const init = async (hashStr) => {
 	let avgSpeedKmH;
 
 	if (!track.length) {
+
+    const user = await checkUserOrAuth('Для получения данных маршрута')
+
 		const url = await window.cloudStorage.getFileUrl(`tracks/${hashTrack}.gpx`);
 		const r = await fetch(url);
 		const fileContent = await r.text();
@@ -118,6 +123,7 @@ const init = async (hashStr) => {
     localStorage.setItem(trackMetaLSKey, JSON.stringify(metaData));
     localStorage.removeItem(logsLastUploadLSKey);
 
+    drawHeader(metaData)
 
     const polyline = L.polyline(
       trackData.map(([a, b]) => ([a,b])),
@@ -154,6 +160,12 @@ const init = async (hashStr) => {
 
   drawHeader(meta);
 
+  window.addEventListener("authStateChange", (e) => {
+    //{ detail: { user } }
+    window.auth.user = e.detail.user
+    drawHeader(meta);
+  })
+
 
 
   const btn = document.getElementById('fab');
@@ -183,7 +195,8 @@ const init = async (hashStr) => {
         }
 
         localStorage.setItem(logsLastUploadLSKey, new Date().toISOString())
-
+        await checkUserOrAuth('Для отправки данных');
+        drawHeader(meta);
         await window.db.set(`logs/${window.auth.user.uid}/${trackHashStr}/${new Date().toISOString().substring(0, 10)}`, logs.map(normalizeLogs));
         this.innerText = '✅';
 
@@ -440,6 +453,7 @@ document.getElementById('stat').appendChild(stat);
     document.getElementById('fab').classList.add('loading');
 
     if (hashUser) {
+      await checkUserOrAuth('Для получения данных');
       const userLogs = await window.db.get(`logs/${hashUser}/${trackHashStr}/${new Date().toISOString().substring(0, 10)}`);
       console.log({userLogs})
       logs = userLogs;
@@ -503,6 +517,7 @@ document.getElementById('stat').appendChild(stat);
   //computeFromCurrentPosition()
 
   if (hashUser) {
+    await checkUserOrAuth('Для получения данных');
     const user = await window.db.get(`users/${hashUser}`);
     document.getElementById('fab').innerHTML = `<svg class="MuiSvgIcon-root MuiSvgIcon-fontSizeSmall  css-f5io2" focusable="false" aria-hidden="true" viewBox="0 0 24 24" width="24" data-testid="SyncIcon" aria-label="fontSize small"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8m0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4z" fill="white"></path></svg>`;
     document.getElementById('fab').title = user.name;
@@ -518,18 +533,7 @@ document.title = 'Наблюдение: ' + user.name + ' на маршруте 
 
     console.log(user);
   }
-
 }
 
-
-setTimeout(() => {
-
-  window.auth.loginListeners.push(() => {
-    init(window.location.hash.substr(1));
-  })
-  !window.auth.user && window.auth.login();
-
-  if (window.auth.user) init(window.location.hash?.substr(1));
-}, 1000)
-
+init(window.location.hash.substr(1))
 

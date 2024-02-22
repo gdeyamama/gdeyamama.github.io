@@ -12,7 +12,7 @@
         messagingSenderId: "462554712065",
         appId: "1:462554712065:web:cf4a4c318c34b38b851800",
         databaseURL: "https://gdeyamama-41094-default-rtdb.europe-west1.firebasedatabase.app",
-        storageBucket: 'gs://gdeyamama-41094.appspot.com'
+        storageBucket: 'gs://gdeyamama-41094.appspot.com',
       };
     
       // Initialize Firebase
@@ -23,7 +23,6 @@
       const auth = getAuth(app);
 
       const storage = getStorage(app);
-      const messaging = getMessaging(app);
 
       //console.log('auth.currentUser', auth.currentUser)
 
@@ -78,13 +77,23 @@
       window.auth = {
         user: null,
         login: () => {
-          setPersistence(auth, browserLocalPersistence).then(() => {
+          return setPersistence(auth, browserLocalPersistence).then(() => {
             const provider = new GoogleAuthProvider();
+
+            const e = localStorage.getItem('last-g-user');
+            if (e) {
+              provider.setCustomParameters({
+                'login_hint': e
+              });
+            }
+
+
             return signInWithPopup(auth,provider);
           })
         },
         logout: () => {
-          signOut(auth);
+          localStorage.removeItem('last-g-user');
+          return signOut(auth);
         },
         loginListeners: [],
         logoutListeners: []
@@ -92,10 +101,18 @@
 
       onAuthStateChanged(auth, (user) => {
         if (user) {
+          const event = new CustomEvent("authStateChange", { detail: { user } });
+          window.dispatchEvent(event)
+
+          localStorage.setItem('last-g-user', user.email)
+
+          console.info('onAuthStateChanged', user)
           window.auth.user = user;
           window.db.set(`users/${user.uid}`, { name: user.displayName, photo: user.photoURL, email: user.email, lastLogin: new Date().toISOString() })
           window.auth.loginListeners.forEach((cb) => cb.call(cb, user))
         } else {
+          const event = new CustomEvent("authStateChange", { detail: { user: null } });
+          window.dispatchEvent(event)
           window.auth.user = null;
           console.log('onAuthStateChanged NO', user);
           window.auth.logoutListeners.forEach((cb) => cb.call(cb))

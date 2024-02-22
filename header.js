@@ -22,12 +22,25 @@ const drawHeader = (meta) => {
         height: 24,
         alt: '👱‍♂️',
         e: {
-          click: () => navigator.clipboard.writeText(prompt('Скопируйте ссылку', location.origin + window.location.hash.split('/') + '/' + window.auth.user.uid)),
+          click: () => {
+            const link = location.origin + window.location.hash.split('/') + '/' + window.auth.user.uid;
+            awaitModal((handleClose) => crEl(
+              crEl('p', {s:{textAlign:'center'}},'Ссылка на активность', crEl('br'), crEl('code', link)),
+              crEl('p', {s:{textAlign:'center'}}, 
+                crEl('button', { c:'button', e: { click: async function() {
+                  handleClose(true, link)
+                } } }, 'Скопировать')
+              )
+            )).then((txt) => {
+              navigator.clipboard.writeText(txt)
+            })
+            
+          },
           contextmenu: () => confirm('Выйти из аккаунта?') && window.auth.logout(),
         },
         title: [window.auth.user.displayName, window.auth.user.email].join('\n'),
       })
-      : crEl('button', {e:{click: () => window.auth.login()}}, 'Войти'))
+      : null)
     ))
 }
 
