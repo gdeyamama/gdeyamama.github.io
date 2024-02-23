@@ -296,7 +296,7 @@ const init = async (hashStr) => {
   
           lastSpeedKmH = speedKmH;
 
-          logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, comment, speed: lastSpeedKmH });
+          !hashUser && logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, comment, speed: lastSpeedKmH });
 
           updateLogs(logs);
 
@@ -311,7 +311,7 @@ const init = async (hashStr) => {
     
 
       } else {
-        logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, speed: 0, comment });
+        !hashUser && logs.push({ date: now.toISOString(), coords: nearPoint, trackIndex: nearInd, speed: 0, comment });
         updateLogs(logs);
       }
 
