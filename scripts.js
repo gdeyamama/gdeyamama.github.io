@@ -81,7 +81,7 @@ const init = async (hashStr) => {
 	const trackMetaStr = localStorage.getItem(trackMetaLSKey);
 
 
-  let [hashTrack, hashUser] = hashStr.split('/');
+  let [hashTrack, hashUser, hashDate] = hashStr.split('/');
 
   if (!hashTrack || !hashTrack.length) {
     const user = await checkUserOrAuth('Для получения списка маршрутов');
@@ -473,7 +473,7 @@ document.getElementById('stat').appendChild(stat);
 
     if (hashUser) {
       await checkUserOrAuth('Для получения данных');
-      const userLogs = await window.db.get(`logs/${hashUser}/${trackHashStr}/${new Date().toISOString().substring(0, 10)}`);
+      const userLogs = await window.db.get(`logs/${hashUser}/${trackHashStr}/${hashDate || new Date().toISOString().substring(0, 10)}`);
       console.log({userLogs})
       logs = userLogs;
       drawLogs(userLogs, map);
