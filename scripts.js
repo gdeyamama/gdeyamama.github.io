@@ -265,7 +265,7 @@ const init = async (hashStr) => {
       if (lasLog) {
         // Тремся на той же точке
         if (lasLog.trackIndex === nearInd || (now - new Date(lasLog.date) <= (stackBySeconds * 1000) || getDistance(lasLog.coords, nearPoint) <= stackByMeters)) {
-          lasLog.dateEnd = now.toISOString();
+          if(!hashUser) { lasLog.dateEnd = now.toISOString(); }
           if (comment) {
             lasLog.comment = lasLog.comment ? [lasLog.comment,comment].join('\n') : comment;
           }
