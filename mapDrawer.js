@@ -36,9 +36,11 @@ function drawLogs(logs, map) {
   logMarkersGroup.addTo(map);
 
   logs.forEach((log) => {
+    const d1 = new Date(log.date).toLocaleTimeString().substr(0,5)
+    const d2 = log.dateEnd ? `-${new Date(log.dateEnd).toLocaleTimeString().substr(0,5)}` : '';
     const icon = L.divIcon({
       className: 'routelog-div-icon',
-      html: "<div data-name='" + new Date(log.date).toLocaleTimeString().substr(0,5) + (log.dateEnd ? `-${new Date(log.dateEnd).toLocaleTimeString().substr(0,5)}` : '') + (log.comment ? '*' : '') +"' class='" + (log.dateEnd ? 'routelog-div-icon-pause': '') + "'></div>",
+      html: "<div data-name='" + d1 + (d1!=d2 ? d2 : '') + (log.comment ? '*' : '') +"' class='" + (log.dateEnd ? 'routelog-div-icon-pause': '') + "'></div>",
       iconSize: [4, 4],
       iconAnchor: [2, 2]
     })

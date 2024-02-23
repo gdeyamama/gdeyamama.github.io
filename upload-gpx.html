@@ -94,12 +94,18 @@
 				|| doc.querySelector('trk>desc')?.textContent
 				|| '',
 		author: {
-			name: window.auth.user.displayName,
-			email: window.auth.user.email
+			name: window.auth.user?.displayName,
+			email: window.auth.user?.email
 		},
 		time: doc.querySelector('metadata>time')?.textContent ?? new Date().toISOString(),
 		keywords: doc.querySelector('metadata>keywords')?.textContent
 	};
+
+  window.addEventListener("authStateChange", (e) => {
+    //{ detail: { user } }
+    meta.author.name = e.detail.user.displayName
+    meta.author.email = e.detail.user.email
+  });
 
 	[...trkpts, ...rtepts].forEach((p) => {
 		const d = [
@@ -250,21 +256,22 @@
 			const file = new Blob([str], { type: 'application/gpx+xml' });
 
 			
-			if (confirm('Скачать файл?')) {
+			if (confirm('Скачать файл на ваше устройство?')) {
 				link.href = URL.createObjectURL(file);
 				link.download = meta.name + ".gpx";
 				link.click();
 				URL.revokeObjectURL(link.href)
 			}
 			
-			if (window.auth.user) {
+      const user = await checkUserOrAuth('Для получения списка маршрутов');
+			if (user) {
 				const trackUid = await window.db.getUniqueKey('tracks');
 				await window.cloudStorage.addFile(`tracks/${trackUid}.gpx`, file);
 				await window.db.set(
 					`tracks/${trackUid}`,
 					{
 						...meta,
-						authorId: window.auth.user.uid
+						authorId: user.uid
 					}
 				);
 				alert(`Загружен на север #${trackUid}`);
@@ -328,7 +335,7 @@
 		
 	}
 
-	setTimeout(() => !window.auth.user && window.auth.login(), 1000)
+	//setTimeout(() => !window.auth.user && window.auth.login(), 1000)
 	
 	</script>
        

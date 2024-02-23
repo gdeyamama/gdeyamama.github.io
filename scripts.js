@@ -231,7 +231,8 @@ const init = async (hashStr) => {
 
 
   function updateLogs(up_logs) {
-    localStorage.setItem(logsDataLSKey, JSON.stringify(up_logs));
+    
+    !hashUser && localStorage.setItem(logsDataLSKey, JSON.stringify(up_logs));
     drawLogs(up_logs, map)
   }
 
@@ -481,8 +482,8 @@ document.getElementById('stat').appendChild(stat);
       drawCurrentPosition(coords, map);
       map.panTo(coords);
 
-      // const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
-      drawChart(track, points, logs[logs.length - 1].trackIndex);
+      const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
+      drawChart(track, points, nearInd)
 
       
 
