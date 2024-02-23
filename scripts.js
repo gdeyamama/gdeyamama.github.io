@@ -481,8 +481,8 @@ document.getElementById('stat').appendChild(stat);
       drawCurrentPosition(coords, map);
       map.panTo(coords);
 
-      const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
-      drawChart(track, points, nearInd)
+      // const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
+      drawChart(track, points, logs[logs.length - 1].trackIndex);
 
       
 
