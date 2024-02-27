@@ -83,6 +83,8 @@ const init = async (hashStr) => {
 
   let [hashTrack, hashUser, hashDate] = hashStr.split('/');
 
+  const todayViewerTrackKey = `viewers/${hashTrack}/${hashUser}/${new Date().toISOString().substring(0, 10)}`;
+
   if (!hashTrack || !hashTrack.length) {
     const user = await checkUserOrAuth('Для получения списка маршрутов');
     const dbTracks = await window.db.get(`tracks`);
@@ -192,6 +194,12 @@ const init = async (hashStr) => {
     computeFromCurrentPosition()
   }
 
+    const headerCenterContainerViewers = document.getElementById('headerCenterContainerViewers');
+    headerCenterContainerViewers.innerHTML = '';
+
+  
+ 
+
   
   const centerContainer = document.getElementById('headerCenterContainer');
   centerContainer.innerHTML = '';
@@ -223,10 +231,28 @@ const init = async (hashStr) => {
   )
 
 
-  btn.oncontextmenu = (e) => {
+  btn.oncontextmenu = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    computeFromCurrentPosition(prompt('Комментарий к отметке', ''))
+
+    if (!hashUser) {
+       computeFromCurrentPosition(prompt('Комментарий к отметке', ''))
+    } else {
+      const userData = await window.db.get(`users/${hashUser}`);
+      if (userData.pushId) {
+        const message = {
+          deviceId: userData.pushId,
+          title: window.auth.user.displayName,
+          body: prompt('Комментарий', 'Давай, Давай!!!'),
+          icon: window.auth.user.photoURL,
+          site: 'https://gdeyamama.github.io/'
+        }
+
+        window.pushMsg.send(message)
+      }
+    }
+
+   
   }
 
 
@@ -485,8 +511,22 @@ document.getElementById('stat').appendChild(stat);
       const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
       drawChart(track, points, nearInd)
 
-      
+      const todayViewerTrackKey = `${todayViewerTrackKey}/${window.auth.user.uid}`;
+      const alreadyViewer = await window.db.get(todayViewerTrackKey);
 
+      if (alreadyViewer) {
+        await window.db.update(todayViewerTrackKey, { count: window.db.increment(), lastView: new Date().toISOString() });
+      } else {
+        await window.db.set(todayViewerTrackKey, {
+          photoURL: window.auth.user.photoURL,
+          displayName: window.auth.user.displayName,
+          email: window.auth.user.email,
+          count: 1,
+          lastView: new Date().toISOString(),
+        });
+      }
+      
+      
       document.getElementById('fab').classList.remove('loading');
     } else {
       navigator.geolocation.getCurrentPosition(function (position) {
@@ -552,6 +592,10 @@ document.title = 'Наблюдение: ' + user.name + ' на маршруте 
 
     console.log(user);
   }
+
+  const userContainer2 = document.getElementById('userContainer2');
+  userContainer2.innerHTML = '';
+
 }
 
 init(window.location.hash.substr(1))

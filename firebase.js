@@ -1,8 +1,11 @@
       // Import the functions you need from the SDKs you need
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
       import { getAuth, GoogleAuthProvider, signInWithPopup, setPersistence, browserLocalPersistence, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-      import { getDatabase, ref, set, child, get, push, increment, onValue } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js'
+      import { getDatabase, ref, set, child, get, push, increment, onValue, update } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js'
       import { getStorage, ref as storageRef, getDownloadURL, listAll, uploadBytes  } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js'
+      import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js'
+ 
+      const vapidKey = 'BNm_XFcD3OEB8txsriK-56ctLoMnZV2PsTKs6qpitcn6zrJhcS3vUU1nif7-bQPuPfeKDNOEZx9Vu9z_NzlRHlA';
 
       const firebaseConfig = {
         apiKey: "AIzaSyCo7VJ_rskVkgvi6gSUEj3A2cegIG4D0Rc",
@@ -24,6 +27,8 @@
 
       const storage = getStorage(app);
 
+      const messaging = getMessaging(app);
+
       //console.log('auth.currentUser', auth.currentUser)
 
       window.db = {
@@ -44,6 +49,10 @@
         getUniqueKey: async (path) => {
           return await push(child(ref(database), path)).key
         },
+        increment: async (count = 1) => {
+          return increment(count);
+        },
+        
 
         addListener: (path, cb) => {
           const r = ref(database, path);
@@ -73,6 +82,33 @@
             return items
         },
       }
+
+      window.pushMsg = {
+        getToken: async () => {
+          return await getToken(messaging, { vapidKey });
+        },
+        send: async (msg) => {
+          const formData = new FormData();
+          formData.append('deviceId', msg.deviceId);
+          formData.append('title', msg.title);
+          formData.append('body', msg.body);
+          formData.append('icon', msg.icon);
+          formData.append('site', msg.site);
+          fetch(`https://fednik.ru/shtorm/webpush/gdeyamama.php`, {
+            method: 'POST',
+            body: formData
+          })
+        }
+      }
+
+      onMessage(messaging, (payload) => {
+        console.log('Message received. ', payload);
+        const event = new CustomEvent("authStateChange1", { detail: { user } });
+        window.dispatchEvent(event)
+        // ...
+      })
+
+ 
        
       window.auth = {
         user: null,
@@ -99,7 +135,7 @@
         logoutListeners: []
       }
 
-      onAuthStateChanged(auth, (user) => {
+      onAuthStateChanged(auth, async (user) => {
         if (user) {
           const event = new CustomEvent("authStateChange", { detail: { user } });
           window.dispatchEvent(event)
@@ -108,7 +144,11 @@
 
           console.info('onAuthStateChanged', user)
           window.auth.user = user;
-          window.db.set(`users/${user.uid}`, { name: user.displayName, photo: user.photoURL, email: user.email, lastLogin: new Date().toISOString() })
+          const cur = await window.db.get(`users/${user.uid}`)
+          if (!cur) {
+            await window.db.set(`users/${user.uid}`, { name: user.displayName, photo: user.photoURL, email: user.email, lastLogin: new Date().toISOString() });
+          }
+          
           window.auth.loginListeners.forEach((cb) => cb.call(cb, user))
         } else {
           const event = new CustomEvent("authStateChange", { detail: { user: null } });
