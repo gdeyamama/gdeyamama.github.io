@@ -22,5 +22,7 @@ importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js')
           "[firebase-messaging-sw.js] Received background message ",
           payload
         );
+        const notification = new Notification(payload.notification.title, { body: payload.notification.body, icon: payload.notification.icon });
+        notification.addEventListener('click', () => { notification.close() })
       })
         // const data = payload?.notification ?? {};

@@ -103,8 +103,10 @@
 
       onMessage(messaging, (payload) => {
         console.log('Message received. ', payload);
-        const event = new CustomEvent("authStateChange1", { detail: { user } });
-        window.dispatchEvent(event)
+        const notification = new Notification(payload.notification.title, { body: payload.notification.body, icon: payload.notification.icon });
+        notification.addEventListener('click', () => { notification.close() })
+        // const event = new CustomEvent("authStateChange1", { detail: { payload } });
+        // window.dispatchEvent(event)
         // ...
       })
 
