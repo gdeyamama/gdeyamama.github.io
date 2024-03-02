@@ -2,6 +2,7 @@ console.info('WANT TO onAuthStateChanged')
 
 const mapElement = document.getElementById('map');
 const map = L.map(mapElement).setView([53.18, 45], 13);
+let viewersPushIds = [];
 
 map.on('click', e => {
   console.log(e.latlng)
@@ -193,11 +194,45 @@ const init = async (hashStr) => {
   btn.onclick = () => {
     computeFromCurrentPosition()
   }
-
+if (!hashUser) {
     const headerCenterContainerViewers = document.getElementById('headerCenterContainerViewers');
     headerCenterContainerViewers.innerHTML = '';
+    headerCenterContainerViewers.appendChild(
+      crEl('abbr', {onclick: async function () {
+        this.innerText = '⏳';
 
-  
+        const viewersMap = await window.db.get(`viewers/${hashTrack}/${window.auth.user.uid}/${new Date().toISOString().substring(0, 10)}`);
+
+/**
+ * 
+ *        photoURL: window.auth.user.photoURL,
+          displayName: window.auth.user.displayName,
+          email: window.auth.user.email,
+          count: 1,
+          lastView: new Date().toISOString(),
+ * 
+ */
+console.log({ viewersMap, todayViewerTrackKey })
+        viewersPushIds = Object.values(viewersMap).filter((u) => u.pushId).map((u) => u.pushId);
+
+        this.innerHTML = '';
+        this.appendChild(
+          crEl('span', {s:{ display:'flex', gap: '5px' }},
+            Object.entries(viewersMap).map(([k,v]) => crEl('img', {
+              src: v.photo,
+              width: '16',
+              s: v.pushId ? {border: '2px solid violet', borderRadius:'50%'} : {}, 
+              onclick: () => alert([v.name, v.count + 'раз', new Date(v.lastView).toLocaleString()].join('\n'))
+            }))
+          )
+        )
+      }},
+        '🔭'
+      )
+    );
+
+
+  }
  
 
   
@@ -225,6 +260,30 @@ const init = async (hashStr) => {
         await checkUserOrAuth('Для отправки данных');
         await window.db.set(`logs/${window.auth.user.uid}/${trackHashStr}/${new Date().toISOString().substring(0, 10)}`, logs.map(normalizeLogs));
         this.innerText = '✅';
+
+        
+        if (viewersPushIds.length) {
+          const lastLog = logs[logs.length - 1];
+          let [nearPoint, nearDist, nearInd] = getNearestPointInfo(lastLog.coords, track, lastLog.trackIndex);
+          
+          const nPoint = points.find((p) => p.trackIndex >= nearInd);
+
+          if (nPoint) {
+            nearDist = getDistanceForTrack(track.slice(lastLog.nearInd, nPoint.trackIndex))
+          }
+
+          viewersPushIds.map((pushId) => {
+            const message = {
+              deviceId: pushId,
+              title: window.auth.user.displayName,
+              body: [lastLog.comment, `${(nearDist/1000).toFixed(1)} км до ${nPoint.name || nearPoint}`].filter(Boolean).join('\n'),
+              icon: window.auth.user.photoURL,
+              site: 'https://gdeyamama.github.io/' + trackHashStr + '/' + window.auth.user.uid + '/' + new Date().toISOString().substring(0, 10)
+            }
+            console.log('Push',{message})
+            window.pushMsg.send(message)
+          })
+        }
 
       }},
     })
@@ -477,6 +536,8 @@ document.getElementById('stat').appendChild(stat);
       const uploadBtn = document.getElementById('uploadBtn');
       if (uploadBtn) {
         uploadBtn.textContent = '⇪ ' + unuploadedLogs.length;
+
+
       }
       
     }
@@ -511,16 +572,17 @@ document.getElementById('stat').appendChild(stat);
       const [nearPoint, nearDist, nearInd] = handleCurrentPosition(coords, new Date());
       drawChart(track, points, nearInd)
 
-      const todayViewerTrackKey = `${todayViewerTrackKey}/${window.auth.user.uid}`;
-      const alreadyViewer = await window.db.get(todayViewerTrackKey);
+      const todayViewerTrackKeyForCurrent = `${todayViewerTrackKey}/${window.auth.user.uid}`;
+      const alreadyViewer = await window.db.get(todayViewerTrackKeyForCurrent);
+      const userData = await window.db.get(`users/${window.auth.user.uid}`)
 
       if (alreadyViewer) {
-        await window.db.update(todayViewerTrackKey, { count: window.db.increment(), lastView: new Date().toISOString() });
+        const path = { ...userData, count: alreadyViewer.count + 1, lastView: new Date().toISOString() };
+        await window.db.set(todayViewerTrackKeyForCurrent, path);
       } else {
-        await window.db.set(todayViewerTrackKey, {
-          photoURL: window.auth.user.photoURL,
-          displayName: window.auth.user.displayName,
-          email: window.auth.user.email,
+        
+        await window.db.set(todayViewerTrackKeyForCurrent, {
+          ...userData,
           count: 1,
           lastView: new Date().toISOString(),
         });

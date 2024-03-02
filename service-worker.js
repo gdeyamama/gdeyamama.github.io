@@ -1,4 +1,4 @@
-const cacheName = "gdeyamama-v3";
+const cacheName = "gdeyamama-v4";
 
 const files = [
   "/icons/120x120.png",

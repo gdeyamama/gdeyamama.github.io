@@ -35,6 +35,11 @@ function drawLogs(logs, map) {
   logMarkersGroup = L.featureGroup();
   logMarkersGroup.addTo(map);
 
+if (!logs) {
+  console.warn('No Logs');
+  return;
+}
+
   logs.forEach((log) => {
     const d1 = new Date(log.date).toLocaleTimeString().substr(0,5)
     const d2 = log.dateEnd ? `-${new Date(log.dateEnd).toLocaleTimeString().substr(0,5)}` : '';
