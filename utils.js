@@ -31,7 +31,9 @@ const getNearestPointInfo = (point, trackPointsArr, startIndex = 0) => {
 			nearDist = curDist;
 			nearPoint = trackPointsArr[i];
 			nearInd = i;
-		}
+		} else {
+      break;
+    }
 	}
 	
 	return [nearPoint, nearDist, nearInd];
@@ -51,7 +53,7 @@ const awaitModal = (cb, afterClose) => {
       el.close();
     }
     
-    el = crEl('dialog', { opern: true }, cb(close));
+    el = crEl('dialog', { open: true }, cb(close));
 
     el.addEventListener("close", (e) => {
       

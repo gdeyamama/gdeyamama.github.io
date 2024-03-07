@@ -1,5 +1,3 @@
-console.info('WANT TO onAuthStateChanged')
-
 const mapElement = document.getElementById('map');
 const map = L.map(mapElement).setView([53.18, 45], 13);
 let viewersPushIds = [];
@@ -16,7 +14,7 @@ const baseLayer = L.tileLayer.offline(urlTemplate, {
 }).addTo(map);
 
 const saveControl = L.control.savetiles(baseLayer, {
-  zoomlevels: [12, 19], // optional zoomlevels to save, default current zoomlevel
+  zoomlevels: [12, 15], // optional zoomlevels to save, default current zoomlevel
   alwaysDownload: false,
   confirm(layer, successCallback) {
     // eslint-disable-next-line no-alert
@@ -27,19 +25,19 @@ const saveControl = L.control.savetiles(baseLayer, {
   },
   confirmRemoval(layer, successCallback) {
     // eslint-disable-next-line no-alert
-    //if (window.confirm('Remove all the tiles?')) {
+    if (window.confirm('Удалить сохраненные Offline слои карты?')) {
       console.log(`remove offline tiles ${layer._tilesforSave.length}`)
       successCallback();
-    //}
+    }
   },
-  saveText: 'ST',
-  rmText: 'RT',
+  saveText: '💾',
+  rmText: '🗑️',
 });
 saveControl.addTo(map);
 
 document.getElementsByClassName( 'leaflet-control-attribution' )[0].style.display = 'none';
 
-document.querySelector(`.savetiles.leaflet-bar`).style.display = 'none';
+//document.querySelector(`.savetiles.leaflet-bar`).style.display = 'none';
 
 const footerElement = document.getElementById('footer');
 const headerElement = document.getElementById('header');
@@ -63,7 +61,6 @@ document.getElementById('installInstructions').style.display = localStorage.getI
 
 
 const clear = () => {
-  document.querySelector('a.rmtiles').click();
   localStorage.removeItem(trackHashLSKey);
   localStorage.removeItem(trackMetaLSKey);
   localStorage.removeItem(trackDataLSKey);
@@ -73,7 +70,7 @@ const clear = () => {
 }
 
 
-const init = async (hashStr) => {
+async function init(hashStr) {
 
   const trackHashStr = localStorage.getItem(trackHashLSKey);
 	const trackDataStr = localStorage.getItem(trackDataLSKey);
@@ -87,7 +84,7 @@ const init = async (hashStr) => {
   const todayViewerTrackKey = `viewers/${hashTrack}/${hashUser}/${new Date().toISOString().substring(0, 10)}`;
 
   if (!hashTrack || !hashTrack.length) {
-    const user = await checkUserOrAuth('Для получения списка маршрутов');
+    await checkUserOrAuth('Для получения списка маршрутов');
     const dbTracks = await window.db.get(`tracks`);
     hashTrack = await awaitModal((handleClose) => crEl(
 
@@ -100,7 +97,7 @@ const init = async (hashStr) => {
         },
           crEl(
             crEl('span', { title: [v.name, v.time, v.author.name, v.keywords, v.desc].join('\n')}, v.name),
-          crEl('small', v.keywords)
+            crEl('small', v.keywords)
           )
         ))
       ),
@@ -108,7 +105,8 @@ const init = async (hashStr) => {
 
     ));
 
-    window.location.hash = '#'+hashTrack
+    window.location.hash = '#'+hashTrack;
+    init(hashTrack);
   }
 
   const isAnotherTrack = hashTrack && trackHashStr && trackHashStr !== hashTrack;
@@ -137,9 +135,7 @@ const init = async (hashStr) => {
 	let avgSpeedKmH;
 
 	if (!track.length) {
-
-    const user = await checkUserOrAuth('Для получения данных маршрута')
-
+    await checkUserOrAuth('Для получения данных маршрута')
 		const url = await window.cloudStorage.getFileUrl(`tracks/${hashTrack}.gpx`);
 		const r = await fetch(url);
 		const fileContent = await r.text();
@@ -150,23 +146,6 @@ const init = async (hashStr) => {
     localStorage.setItem(trackDataLSKey, JSON.stringify(trackData));
     localStorage.setItem(trackMetaLSKey, JSON.stringify(metaData));
     localStorage.removeItem(logsLastUploadLSKey);
-
-    drawHeader(metaData)
-
-    const polyline = L.polyline(
-      trackData.map(([a, b]) => ([a,b])),
-      {
-        color: 'grey',
-        weight: 6,
-        opacity: 0.5
-      }
-    );
-    polyline.addTo(map);
-    
-    map.fitBounds(polyline.getBounds());
-
-    document.querySelector('a.savetiles').click()
-
 
     return init(hashStr);
 	} 
@@ -180,6 +159,7 @@ const init = async (hashStr) => {
       opacity: 0.5
     }
   );
+
   polyline.addTo(map);
   
   map.fitBounds(polyline.getBounds());
@@ -188,31 +168,19 @@ const init = async (hashStr) => {
 
   drawHeader(meta);
 
-
-
   const btn = document.getElementById('fab');
   btn.onclick = () => {
     computeFromCurrentPosition()
   }
+
+
 if (!hashUser) {
     const headerCenterContainerViewers = document.getElementById('headerCenterContainerViewers');
     headerCenterContainerViewers.innerHTML = '';
     headerCenterContainerViewers.appendChild(
       crEl('abbr', {onclick: async function () {
         this.innerText = '⏳';
-
         const viewersMap = await window.db.get(`viewers/${hashTrack}/${window.auth.user.uid}/${new Date().toISOString().substring(0, 10)}`);
-
-/**
- * 
- *        photoURL: window.auth.user.photoURL,
-          displayName: window.auth.user.displayName,
-          email: window.auth.user.email,
-          count: 1,
-          lastView: new Date().toISOString(),
- * 
- */
-console.log({ viewersMap, todayViewerTrackKey })
         viewersPushIds = Object.values(viewersMap).filter((u) => u.pushId).map((u) => u.pushId);
 
         this.innerHTML = '';
@@ -327,7 +295,10 @@ console.log({ viewersMap, todayViewerTrackKey })
     const stackByMeters = 50; // Схлопывать если расстоние между отметками меньше N метров
     const allowPointsDistance = 100; // За сколько метров от любой точки трека можно отметиться на ней
 
-    let [nearPoint, nearDist, nearInd] = getNearestPointInfo(coords, track);
+    const lastLog = logs[logs.length - 1];
+    const lastTrackIndex = lastLog?.trackIndex ?? 0;
+
+    let [nearPoint, nearDist, nearInd] = getNearestPointInfo(coords, track, lastTrackIndex);
 
     if (logs.length == 0) {
       // Если нет логов считаем бижайшей нулевую точку маршрута (старт)
@@ -338,7 +309,7 @@ console.log({ viewersMap, todayViewerTrackKey })
       
     } else {
       // Если есть логи ближайшей считаем ближайшую в треке  к сoords, начиная с индекса последнего лога
-      [nearPoint, nearDist, nearInd] = getNearestPointInfo(coords, track, logs[logs.length - 1].trackIndex);
+      [nearPoint, nearDist, nearInd] = getNearestPointInfo(coords, track, lastTrackIndex);
     }
 
     // Рядом с треком (следующая точка в радиусе 100 метров)
@@ -556,12 +527,12 @@ document.getElementById('stat').appendChild(stat);
   }
 
 	async function computeFromCurrentPosition(comment) {
+    
     document.getElementById('fab').classList.add('loading');
 
     if (hashUser) {
       await checkUserOrAuth('Для получения данных');
       const userLogs = await window.db.get(`logs/${hashUser}/${trackHashStr}/${hashDate || new Date().toISOString().substring(0, 10)}`);
-      console.log({userLogs})
       logs = userLogs;
       drawLogs(userLogs, map);
       
